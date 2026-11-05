@@ -79,7 +79,7 @@ function vCampo(){
   const l=rows.filter(r=>r.estado==="Mandado recolher"||r.estado==="Em recolha");
   return `<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${r.id}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
 }
-function vAdmin(){
+function vAdmin0(){
   if(!adminOk)return `<div class="card"><label>Palavra-passe do administrador</label><input type="password" id="pw"><button class="big" id="adm">Entrar</button><p class="m">${msg}</p></div>`;
   const n=i=>rows.filter(r=>r.estado===ESTADOS[i]).length;
   const fin=rows.filter(r=>r.tf&&r.estado==="Recolhido");
@@ -88,6 +88,25 @@ function vAdmin(){
   <p class="m">Tempo médio até à recolha: ${med} h · <button class="sm" id="csv">⬇️ Exportar CSV (QGIS)</button></p>
   <div class="card"><b>Definições</b><label>Nova palavra-passe do administrador</label><input type="text" id="np"><label>Novo código da equipa de campo</label><input type="text" id="nc" placeholder="deixe vazio para manter"><button class="big" id="sv">Guardar</button><button class="sm" id="out">Sair</button><p class="m">${msg}</p></div>`+
   rows.map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${r.id}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`:""))).join("");
+}
+let atab=0,per=0;
+const DIAS=[0,1,7,30],COLS=["Pedidos","Pendentes","Mandados ao campo","Em recolha","Recolhidos","Críticos (≥100%)","% médio","h Morador→Admin","h Admin→Campo","h Recolha","h Total"];
+function filt(){const d=DIAS[per];return d?rows.filter(r=>r.ts>=Date.now()-d*864e5):rows}
+const hh=(rs,b,a)=>{const x=rs.filter(r=>r[b]&&r[a]).map(r=>r[b]-r[a]);return x.length?Math.round(x.reduce((p,q)=>p+q,0)/x.length/36e5*10)/10:null};
+function est(rs){return [rs.length,rs.filter(r=>r.estado==="Reportado").length,rs.filter(r=>r.tm).length,rs.filter(r=>r.estado==="Em recolha").length,rs.filter(r=>r.estado==="Recolhido").length,rs.filter(r=>r.pct>=100).length,rs.length?Math.round(rs.reduce((a,r)=>a+r.pct,0)/rs.length):null,hh(rs,"tm","ts"),hh(rs,"tr","tm"),hh(rs,"tf","tr"),hh(rs,"tf","ts")]}
+function tabela(){const f=filt();return [["TOTAL",f]].concat(BAIRROS.map(b=>[b,f.filter(r=>r.bairro===b)]).filter(x=>x[1].length)).map(([b,rs])=>[b].concat(est(rs)))}
+function dl(n,t){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+t],{type:"text/csv"}));a.download=n;a.click()}
+function vRelAdm(){
+  const T=tabela(),td="padding:6px;border-bottom:1px solid var(--b);text-align:right;white-space:nowrap";
+  return `<label>Período</label><select id="per">${["Tudo","Hoje","Últimos 7 dias","Últimos 30 dias"].map((x,i)=>`<option value="${i}" ${i===per?"selected":""}>${x}</option>`).join("")}</select>
+  <p class="m">Pedidos, mandados ao campo e recolhas por bairro. Tempos em horas.</p>
+  <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:13px"><tr><th style="${td};text-align:left">Bairro</th>${COLS.map(c=>`<th style="${td}">${c}</th>`).join("")}</tr>
+  ${T.map(l=>`<tr><td style="${td};text-align:left"><b>${l[0]}</b></td>${l.slice(1).map(v=>`<td style="${td}">${v===null?"–":v}</td>`).join("")}</tr>`).join("")}</table></div>
+  <button class="sm" id="dl1">⬇️ Relatório por bairro (CSV)</button><button class="sm" id="dl2">⬇️ Todos os pedidos (CSV)</button>`;
+}
+function vAdmin(){
+  if(!adminOk)return vAdmin0();
+  return `<div class="tabs"><button class="${atab===0?"on":""}" data-a="0">Pedidos</button><button class="${atab===1?"on":""}" data-a="1">Relatório</button></div>`+(atab===1?vRelAdm():vAdmin0());
 }
 function exportar(){
   const h="bairro,percentagem,lat,lng,data,estado\n"+rows.map(r=>[r.bairro,r.pct,r.lat,r.lng,new Date(r.ts).toISOString(),r.estado].join(",")).join("\n");
@@ -128,6 +147,10 @@ function draw(){
   const ok=$("#ok");if(ok)ok.onclick=async()=>{PW=$("#cod").value;await load(true);if(role==="campo"||role==="admin"){campoOk=true;msg=""}else{msg="Código errado.";PW=""}draw()};
   document.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{const[i,s]=b.dataset.e.split("|");upd(i,s)});
   const c=$("#csv");if(c)c.onclick=exportar;
+  document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{atab=+b.dataset.a;draw()});
+  const pe=$("#per");if(pe)pe.onchange=()=>{per=+pe.value;draw()};
+  const d1=$("#dl1");if(d1)d1.onclick=()=>dl("relatorio_bairros.csv",["bairro"].concat(COLS).join(",")+"\n"+tabela().map(l=>l.map(v=>v===null?"":v).join(",")).join("\n"));
+  const d2=$("#dl2");if(d2)d2.onclick=()=>{const t=x=>x?new Date(x).toISOString():"";const h=(a,b)=>a&&b?Math.round((a-b)/36e5*100)/100:"";dl("pedidos.csv","id,bairro,pct,lat,lng,estado,data_pedido,data_mandado,data_inicio_recolha,data_recolhido,h_total\n"+filt().map(r=>[r.id,r.bairro,r.pct,r.lat,r.lng,r.estado,t(r.ts),t(r.tm),t(r.tr),t(r.tf),h(r.tf,r.ts)].join(",")).join("\n"))};
   const ad=$("#adm");if(ad)ad.onclick=async()=>{PW=$("#pw").value;await load(true);if(role==="admin"){adminOk=true;msg=""}else{msg="Palavra-passe errada.";PW=""}draw()};
   const sv=$("#sv");if(sv)sv.onclick=async()=>{const p=$("#np").value.trim(),k=$("#nc").value.trim();const ok=await api({action:"config",admin:p,campo:k});if(ok&&p)PW=p;msg=ok?"✅ Guardado.":"Falhou.";draw()};
   const ot=$("#out");if(ot)ot.onclick=()=>{adminOk=false;msg="";draw()};
