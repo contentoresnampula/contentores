@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8">
+<meta name="theme-color" content="#2f7d46"><meta name="mobile-web-app-capable" content="yes"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contentores Nampula</title>
+<style>
+:root{--bg:#f4f6f2;--c:#fff;--t:#1b2a1e;--m:#5f6d62;--b:#d9dfd6;--g:#2f7d46;--y:#c99700;--r:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131a14;--c:#1d261f;--t:#e7eee8;--m:#9aa99d;--b:#2e3a30}}
+:root[data-theme="dark"]{--bg:#131a14;--c:#1d261f;--t:#e7eee8;--m:#9aa99d;--b:#2e3a30}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--t);font:16px/1.4 system-ui,sans-serif;max-width:560px;margin:auto;padding:12px}
+h1{font-size:19px;margin:4px 0 10px}.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{flex:1;padding:10px 2px;border:1px solid var(--b);background:var(--c);color:var(--t);border-radius:10px;font-size:13px}
+.tabs button.on{background:var(--g);color:#fff;border-color:var(--g)}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin-bottom:10px}
+label{display:block;font-size:13px;color:var(--m);margin:10px 0 4px}
+select,input[type=text],input[type=password]{width:100%;padding:10px;border-radius:8px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:16px}
+.pcts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pcts button{padding:10px 0;border:1px solid var(--b);border-radius:8px;background:var(--bg);color:var(--t);font-size:14px}
+.pcts button.on{background:var(--g);color:#fff}
+.big{width:100%;padding:13px;border:0;border-radius:10px;background:var(--g);color:#fff;font-size:16px;margin-top:12px}
+.sm{padding:7px 10px;border:1px solid var(--b);border-radius:8px;background:var(--bg);color:var(--t);font-size:13px;margin:6px 6px 0 0;text-decoration:none;display:inline-block}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;color:#fff}
+img.f{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:8px}
+.m{color:var(--m);font-size:13px}.st{display:flex;gap:8px;margin-bottom:10px}.st div{flex:1;text-align:center}.st b{display:block;font-size:22px}
+</style></head><body>
+<h1>♻️ Contentores de Nampula <button class="sm" id="info">ℹ️ Sobre</button></h1>
+<div class="tabs"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button><button id="t3">Relatórios</button></div>
+<div id="v"></div>
+<script>
+const BAIRROS=["Central","Bombeiros","25 de Setembro","1.º de Maio","Limoeiros","Militar","Muatala","Mutauanha","Muhala","Namutequeliua","Muahivire","Namicopo","Mutava-Rex","Napipine","Carrupeia","Natikiri","Marrupaniua","Marrere"];
+const CFG=(()=>{try{return JSON.parse(localStorage.getItem("cfg"))||{}}catch(e){return{}}})();
+CFG.admin=CFG.admin||"admin123";CFG.campo=CFG.campo||"CAMPO2026";
+CFG.bio=CFG.bio||"João Celestino é geólogo e vive em Nampula-cidade. É Técnico em Geologia e Técnico Auxiliar em Mineração (Instituto Médio de Geologia e Minas de Moatize) e tem formação em Modelação 3D e em Modelagem Espacial de Riscos Ambientais com SIG. Criou esta ferramenta para ajudar Nampula a manter as ruas limpas, usando a localização e os dados para decidir melhor onde e quando recolher o lixo.";
+const saveCfg=()=>{try{localStorage.setItem("cfg",JSON.stringify(CFG))}catch(e){}};
+const ESTADOS=["Reportado","Mandado recolher","Em recolha","Recolhido"];
+const COR=["#c0392b","#d9822b","#c99700","#2f7d46"];
+let intro=!localStorage.getItem("intro"),tab=0,rows=[],PW="",role="",adminOk=false,campoOk=false,pct=50,foto=null,pos=null,msg="";
+function LS0(){try{return JSON.parse(localStorage.getItem("rep")||"[]")}catch(e){return[]}}
+const $=s=>document.querySelector(s);
+const LS={get(){try{return JSON.parse(localStorage.getItem("rep")||"[]")}catch(e){return[]}},set(v){try{localStorage.setItem("rep",JSON.stringify(v))}catch(e){}}};
+draw();
+const URL_API="https://script.google.com/macros/s/AKfycbxTGFkUwH_wNcJxidHLcnFAYlK_ZnYV1reojVLDQL5gYhNvYftCq_nKj3OVSHe4couXaQ/exec";
+async function api(b){try{const r=await fetch(URL_API,{method:"POST",body:JSON.stringify({...b,pw:PW})});const j=await r.json();if(j.ok)load(true);return j.ok}catch(e){return false}}
+async function load(quiet){try{const r=await fetch(URL_API+"?pw="+encodeURIComponent(PW));const j=await r.json();rows=(j.rows||[]).sort((a,b)=>(a.estado==="Recolhido")-(b.estado==="Recolhido")||b.pct-a.pct||a.ts-b.ts);role=j.role||""}catch(e){if(!quiet)msg="Sem ligação ao servidor."}
+  if(!quiet||(tab!==0&&!intro))draw()}
+async function upd(id,estado){await api({action:"estado",id,estado})}
+function pegarGPS(){
+  msg="A obter localização…";draw();
+  navigator.geolocation.getCurrentPosition(p=>{pos={lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)};msg="";draw()},()=>{msg="Sem GPS. Ative a localização do telemóvel.";draw()},{enableHighAccuracy:true,timeout:15000});
+}
+function reduzir(file){
+  const img=new Image,url=URL.createObjectURL(file);
+  img.onload=()=>{const k=Math.min(1,520/img.width),c=document.createElement("canvas");c.width=img.width*k;c.height=img.height*k;c.getContext("2d").drawImage(img,0,0,c.width,c.height);foto=c.toDataURL("image/jpeg",.6);URL.revokeObjectURL(url);draw()};
+  img.src=url;
+}
+async function enviar(){
+  const b=$("#bairro").value;
+  if(!b||!pos||!foto){msg="Falta bairro, foto ou localização.";draw();return}
+  msg="A enviar…";draw();if(!await api({action:"novo",bairro:b,pct,lat:pos.lat,lng:pos.lng,foto})){msg="Falhou. Verifique a internet e tente de novo.";draw();return}
+  foto=null;pos=null;msg="✅ Reporte enviado. Obrigado!";draw();
+}
+const fmt=t=>new Date(t).toLocaleString("pt-PT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+const maps=r=>"https://www.google.com/maps?q="+r.lat+","+r.lng;
+const urg=p=>p>=100?"#c0392b":p>=75?"#d9822b":"#c99700";
+function item(r,acoes){const uc=r.estado==="Recolhido"?"#2f7d46":urg(r.pct);
+  return `<div class="card" style="border-left:6px solid ${uc}"><b>${r.bairro}</b> <span class="tag" style="background:${uc}">${r.pct>=125?"Transbordando":r.pct+"%"}</span> <span class="tag" style="background:${COR[ESTADOS.indexOf(r.estado)]}">${r.estado}</span>
+  <div class="m">${fmt(r.ts)} · ${r.lat}, ${r.lng}</div>${r.foto?`<img class="f" src="${r.foto}">`:""}
+  <a class="sm" href="${maps(r)}" target="_blank" rel="noopener">📍 Ver no Google Maps</a>${acoes||""}</div>`;
+}
+function vMorador(){
+  return `<div class="card"><label>1. Foto do contentor</label>
+  <input type="file" accept="image/*" capture="environment" id="ff">${foto?`<img class="f" src="${foto}">`:""}
+  <label>2. Localização</label><button class="sm" id="gps">📍 ${pos?pos.lat+", "+pos.lng:"Obter localização"}</button>
+  <label>3. Bairro</label><select id="bairro"><option value="">Escolher…</option>${BAIRROS.map(b=>`<option>${b}</option>`).join("")}</select>
+  <label>4. Quanto está cheio?</label><div class="pcts">${[25,50,75,100,125].map(p=>`<button data-p="${p}" class="${p===pct?"on":""}">${p===125?"Transb.":p+"%"}</button>`).join("")}</div>
+  <button class="big" id="env">Enviar reporte</button><p class="m">${msg}</p></div>`;
+}
+function vCampo(){
+  if(!campoOk)return `<div class="card"><label>Código de acesso da equipa</label><input type="password" id="cod"><button class="big" id="ok">Entrar</button><p class="m">${msg}</p></div>`;
+  const l=rows.filter(r=>r.estado==="Mandado recolher"||r.estado==="Em recolha");
+  return `<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${r.id}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
+}
+function vAdmin(){
+  if(!adminOk)return `<div class="card"><label>Palavra-passe do administrador</label><input type="password" id="pw"><button class="big" id="adm">Entrar</button><p class="m">${msg}</p></div>`;
+  const n=i=>rows.filter(r=>r.estado===ESTADOS[i]).length;
+  const fin=rows.filter(r=>r.tf&&r.estado==="Recolhido");
+  const med=fin.length?Math.round(fin.reduce((a,r)=>a+(r.tf-r.ts),0)/fin.length/36e5*10)/10:"–";
+  return `<div class="st">${ESTADOS.map((e,i)=>`<div class="card"><b>${n(i)}</b><span class="m">${e}</span></div>`).join("")}</div>
+  <p class="m">Tempo médio até à recolha: ${med} h · <button class="sm" id="csv">⬇️ Exportar CSV (QGIS)</button></p>
+  <div class="card"><b>Definições</b><label>Nova palavra-passe do administrador</label><input type="text" id="np"><label>Novo código da equipa de campo</label><input type="text" id="nc" placeholder="deixe vazio para manter"><button class="big" id="sv">Guardar</button><button class="sm" id="out">Sair</button><p class="m">${msg}</p></div>`+
+  rows.map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${r.id}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`:""))).join("");
+}
+function exportar(){
+  const h="bairro,percentagem,lat,lng,data,estado\n"+rows.map(r=>[r.bairro,r.pct,r.lat,r.lng,new Date(r.ts).toISOString(),r.estado].join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([h],{type:"text/csv"}));a.download="reportes.csv";a.click();
+}
+function avg(a){return a.length?(Math.round(a.reduce((x,y)=>x+y,0)/a.length/36e5*10)/10)+" h":"–"}
+const gap=(rs,b,a)=>avg(rs.filter(r=>r[b]&&r[a]).map(r=>r[b]-r[a]));
+function linhas(){return [["Todos os bairros",rows]].concat(BAIRROS.map(b=>[b,rows.filter(r=>r.bairro===b)]).filter(x=>x[1].length)).map(([b,rs])=>({b,n:rs.length,p:rs.filter(r=>r.estado!=="Recolhido").length,a:gap(rs,"tm","ts"),c:gap(rs,"tr","tm"),d:gap(rs,"tf","tr"),t:gap(rs,"tf","ts")}))}
+function vRel(){
+  const L=linhas();
+  if(!rows.length)return `<div class="card m">Ainda não há reportes.</div>`;
+  return `<p class="m">Tempos médios entre cada etapa, por bairro. Dados abertos para todos.</p><button class="sm" id="csv2">⬇️ Exportar relatório (CSV)</button>`+L.map(l=>`<div class="card"><b>${l.b}</b> <span class="m">· ${l.n} reporte(s) · ${l.p} pendente(s)</span>
+  <div class="m">① Morador → Admin manda recolher: <b>${l.a}</b></div>
+  <div class="m">② Admin → Campo inicia: <b>${l.c}</b></div>
+  <div class="m">③ Campo: recolha concluída: <b>${l.d}</b></div>
+  <div style="margin-top:6px">Tempo total (reporte → recolhido): <b>${l.t}</b></div></div>`).join("");
+}
+function vIntro(){
+  return `<div class="card"><b style="font-size:18px">Bem-vindo</b>
+  <p class="m">Quem criou</p><p>${CFG.bio}</p>
+  <p class="m">Objectivos</p><ul><li>Evitar lixo espalhado na rua quando os contentores enchem.</li><li>Avisar rapidamente a equipa, com foto e localização exata.</li><li>Dar transparência: medir quanto tempo demora cada etapa, bairro a bairro.</li></ul>
+  <p class="m">Recomendações aos moradores</p><ul><li>Tire a foto junto ao contentor, com o contentor e o lixo à volta bem visíveis.</li><li>Ative a localização do telemóvel antes de enviar.</li><li>Faça um reporte por contentor por dia; não repita.</li><li>Deite o lixo dentro do contentor e nunca queime.</li></ul>
+  <p class="m">Quando alertar</p><ul><li><b>75%:</b> quase cheio, bom momento para avisar.</li><li><b>100%:</b> cheio, avise já.</li><li><b>Transbordando:</b> urgente, há lixo no chão.</li></ul>
+  <p class="m">Esta aplicação não serve para emergências de saúde ou segurança.</p>
+  <button class="big" id="go">Começar</button></div>`;
+}
+function draw(){
+  [0,1,2,3].forEach(i=>$("#t"+i).className=i===tab?"on":"");document.querySelector(".tabs").style.display=intro?"none":"flex";
+  const keep=$("#bairro")?$("#bairro").value:"";
+  $("#v").innerHTML=intro?vIntro():[vMorador,vCampo,vAdmin,vRel][tab]();
+  const go=$("#go");if(go)go.onclick=()=>{intro=false;try{localStorage.setItem("intro","1")}catch(e){}draw()};
+  const c2=$("#csv2");if(c2)c2.onclick=()=>{const h="bairro,reportes,pendentes,morador_ate_admin,admin_ate_campo,recolha,total\n"+linhas().map(l=>[l.b,l.n,l.p,l.a,l.c,l.d,l.t].join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([h],{type:"text/csv"}));a.download="relatorio.csv";a.click()};
+  if($("#bairro"))$("#bairro").value=keep;
+  const g=$("#gps");if(g)g.onclick=pegarGPS;
+  const ff=$("#ff");if(ff)ff.onchange=e=>e.target.files[0]&&reduzir(e.target.files[0]);
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{pct=+b.dataset.p;draw()});
+  const e=$("#env");if(e)e.onclick=enviar;
+  const ok=$("#ok");if(ok)ok.onclick=async()=>{PW=$("#cod").value;await load(true);if(role==="campo"||role==="admin"){campoOk=true;msg=""}else{msg="Código errado.";PW=""}draw()};
+  document.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{const[i,s]=b.dataset.e.split("|");upd(i,s)});
+  const c=$("#csv");if(c)c.onclick=exportar;
+  const ad=$("#adm");if(ad)ad.onclick=async()=>{PW=$("#pw").value;await load(true);if(role==="admin"){adminOk=true;msg=""}else{msg="Palavra-passe errada.";PW=""}draw()};
+  const sv=$("#sv");if(sv)sv.onclick=async()=>{const p=$("#np").value.trim(),k=$("#nc").value.trim();const ok=await api({action:"config",admin:p,campo:k});if(ok&&p)PW=p;msg=ok?"✅ Guardado.":"Falhou.";draw()};
+  const ot=$("#out");if(ot)ot.onclick=()=>{adminOk=false;msg="";draw()};
+}
+[0,1,2,3].forEach(i=>$("#t"+i).onclick=()=>{tab=i;msg="";draw()});
+$("#info").onclick=()=>{intro=true;draw()};
+load();setInterval(()=>load(true),15000);
+</script></body></html>
