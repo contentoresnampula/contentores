@@ -74,10 +74,21 @@ function vMorador(){
   <label>4. Quanto está cheio?</label><div class="pcts">${[25,50,75,100,125].map(p=>`<button data-p="${p}" class="${p===pct?"on":""}">${p===125?"Transb.":p+"%"}</button>`).join("")}</div>
   <button class="big" id="env">Enviar reporte</button><p class="m">${msg}</p></div>`;
 }
+let ctab=0;
+const perSel=()=>`<label>Período</label><select id="per">${["Tudo","Hoje","Últimos 7 dias","Últimos 30 dias"].map((x,i)=>`<option value="${i}" ${i===per?"selected":""}>${x}</option>`).join("")}</select>`;
+const HC=["Bairro","Aguardam","Em recolha","Recolhidos","h Recolha","h Mandado→Recolhido"];
+function tabC(){const f=filt();return [["TOTAL",f]].concat(BAIRROS.map(b=>[b,f.filter(r=>r.bairro===b)]).filter(x=>x[1].length)).map(([b,rs])=>[b,rs.filter(r=>r.estado==="Mandado recolher").length,rs.filter(r=>r.estado==="Em recolha").length,rs.filter(r=>r.estado==="Recolhido").length,hh(rs,"tf","tr"),hh(rs,"tf","tm")])}
+function vRelCampo(){
+  const D=tabC(),td="padding:6px;border-bottom:1px solid var(--b);text-align:right;white-space:nowrap";
+  return perSel()+`<p class="m">Recolhas da equipa por bairro. Tempos em horas.</p><div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:13px"><tr>${HC.map((c,k)=>`<th style="${td};${k?"":"text-align:left"}">${c}</th>`).join("")}</tr>${D.map(l=>`<tr>${l.map((v,k)=>`<td style="${td};${k?"":"text-align:left;font-weight:600"}">${v===null?"–":v}</td>`).join("")}</tr>`).join("")}</table></div>
+  <button class="sm" id="c1">⬇️ CSV</button><button class="sm" id="c2">🖼 Imagem</button><button class="sm" id="c3">📄 PDF</button>`;
+}
 function vCampo(){
   if(!campoOk)return `<div class="card"><label>Código de acesso da equipa</label><input type="password" id="cod"><button class="big" id="ok">Entrar</button><p class="m">${msg}</p></div>`;
+  const sub=`<div class="tabs"><button class="${ctab===0?"on":""}" data-c="0">Recolher</button><button class="${ctab===1?"on":""}" data-c="1">Relatório</button></div>`;
+  if(ctab===1)return sub+vRelCampo();
   const l=rows.filter(r=>r.estado==="Mandado recolher"||r.estado==="Em recolha");
-  return `<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${r.id}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
+  return sub+`<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${r.id}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
 }
 function vAdmin0(){
   if(!adminOk)return `<div class="card"><label>Palavra-passe do administrador</label><input type="password" id="pw"><button class="big" id="adm">Entrar</button><p class="m">${msg}</p></div>`;
@@ -87,7 +98,7 @@ function vAdmin0(){
   return `<div class="st">${ESTADOS.map((e,i)=>`<div class="card"><b>${n(i)}</b><span class="m">${e}</span></div>`).join("")}</div>
   <p class="m">Tempo médio até à recolha: ${med} h · <button class="sm" id="csv">⬇️ Exportar CSV (QGIS)</button></p>
   <div class="card"><b>Definições</b><label>Nova palavra-passe do administrador</label><input type="text" id="np"><label>Novo código da equipa de campo</label><input type="text" id="nc" placeholder="deixe vazio para manter"><button class="big" id="sv">Guardar</button><button class="sm" id="out">Sair</button><p class="m">${msg}</p></div>`+
-  rows.map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${r.id}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`:""))).join("");
+  rows.filter(r=>r.estado!=="Recolhido").map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${r.id}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`:"")+`<button class="sm" data-del="${r.id}">🗑 Eliminar</button>`)).join("");
 }
 let atab=0,per=0;
 const DIAS=[0,1,7,30],COLS=["Pedidos","Pendentes","Mandados ao campo","Em recolha","Recolhidos","Críticos (≥100%)","% médio","h Morador→Admin","h Admin→Campo","h Recolha","h Total"];
@@ -102,11 +113,33 @@ function vRelAdm(){
   <p class="m">Pedidos, mandados ao campo e recolhas por bairro. Tempos em horas.</p>
   <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:13px"><tr><th style="${td};text-align:left">Bairro</th>${COLS.map(c=>`<th style="${td}">${c}</th>`).join("")}</tr>
   ${T.map(l=>`<tr><td style="${td};text-align:left"><b>${l[0]}</b></td>${l.slice(1).map(v=>`<td style="${td}">${v===null?"–":v}</td>`).join("")}</tr>`).join("")}</table></div>
-  <button class="sm" id="dl1">⬇️ Relatório por bairro (CSV)</button><button class="sm" id="dl2">⬇️ Todos os pedidos (CSV)</button>`;
+  <button class="sm" id="dl1">⬇️ Relatório por bairro (CSV)</button><button class="sm" id="dl2">⬇️ Todos os pedidos (CSV)</button><button class="sm" id="dl3">🖼 Imagem</button><button class="sm" id="dl4">📄 PDF</button>`;
+}
+function vArq(){
+  const l=rows.filter(r=>r.estado==="Recolhido").sort((a,b)=>(b.tf||b.ts)-(a.tf||a.ts));
+  return `<p class="m">${l.length} pedido(s) arquivado(s). Continuam a contar nos relatórios.</p>
+  <div class="card"><label>Eliminar vários</label><select id="olds"><option value="30">Arquivados há mais de 30 dias</option><option value="60">Arquivados há mais de 60 dias</option><option value="90">Arquivados há mais de 90 dias</option><option value="0">Todos os arquivados</option></select><button class="big" id="delmany" style="background:var(--r)">Eliminar vários</button></div>`+(l.map(r=>item(r,`<button class="sm" data-del="${r.id}">🗑 Eliminar</button>`)).join("")||`<div class="card m">O arquivo está vazio.</div>`);
 }
 function vAdmin(){
   if(!adminOk)return vAdmin0();
-  return `<div class="tabs"><button class="${atab===0?"on":""}" data-a="0">Pedidos</button><button class="${atab===1?"on":""}" data-a="1">Relatório</button></div>`+(atab===1?vRelAdm():vAdmin0());
+  const t=["Ativos","Arquivo","Relatório"].map((n,k)=>`<button class="${atab===k?"on":""}" data-a="${k}">${n}</button>`).join("");
+  return `<div class="tabs">${t}</div>`+[vAdmin0,vArq,vRelAdm][atab]();
+}
+const HA=["Bairro","Pedidos","Pend.","Mandad.","Em rec.","Recolh.","Crít.","% méd.","h M→A","h A→C","h Rec.","h Total"];
+function toImg(t,head,data){
+  const cw=[150].concat(head.slice(1).map(()=>76)),W=cw.reduce((a,b)=>a+b,0)+40,H=110+data.length*30;
+  const c=document.createElement("canvas");c.width=W*2;c.height=H*2;const x=c.getContext("2d");x.scale(2,2);
+  x.fillStyle="#fff";x.fillRect(0,0,W,H);x.textAlign="left";x.fillStyle="#1b2a1e";x.font="bold 18px sans-serif";x.fillText(t,20,34);
+  x.font="12px sans-serif";x.fillStyle="#5f6d62";x.fillText("Contentores de Nampula · "+new Date().toLocaleString("pt-PT")+" · "+["Todo o período","Hoje","Últimos 7 dias","Últimos 30 dias"][per],20,56);
+  let y=84;[head].concat(data).forEach((row,i)=>{
+    if(i===0){x.fillStyle="#2f7d46";x.fillRect(20,y-18,W-40,28)}else if(i%2===0){x.fillStyle="#f2f5f0";x.fillRect(20,y-18,W-40,28)}
+    let px=20;row.forEach((v,j)=>{x.fillStyle=i===0?"#fff":"#1b2a1e";x.font=(i<2?"bold ":"")+"11px sans-serif";x.textAlign=j?"right":"left";x.fillText(v===null?"–":String(v),j?px+cw[j]-8:px+8,y);px+=cw[j]});y+=30});
+  const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download="relatorio.png";a.click();
+}
+function toPdf(t,head,data){
+  const w=window.open("","_blank");if(!w){alert("Permita janelas pop-up para gerar o PDF.");return}
+  w.document.write(`<title>${t}</title><body style="font-family:sans-serif"><h2>${t}</h2><p>Contentores de Nampula · ${new Date().toLocaleString("pt-PT")}</p><table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;font-size:12px"><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr>${data.map(r=>`<tr>${r.map(v=>`<td>${v===null?"–":v}</td>`).join("")}</tr>`).join("")}</table><p style="font-size:12px">Para guardar em PDF, escolha "Guardar como PDF" na impressão.</p>`);
+  w.document.close();w.focus();setTimeout(()=>w.print(),300);
 }
 function exportar(){
   const h="bairro,percentagem,lat,lng,data,estado\n"+rows.map(r=>[r.bairro,r.pct,r.lat,r.lng,new Date(r.ts).toISOString(),r.estado].join(",")).join("\n");
@@ -126,7 +159,7 @@ function vRel(){
 }
 function vIntro(){
   return `<div class="card"><b style="font-size:18px">Bem-vindo</b>
-  <p class="m">Quem criou</p><p>${CFG.bio}</p>
+  <p class="m">Quem criou</p><p style="margin:0"><b style="font-size:17px">João Celestino</b></p><div style="margin:6px 0">${["Natural de Nampula","Geólogo","Modelador 3D","Técnico de SIG"].map(t=>`<span class="tag" style="background:var(--g);margin:0 6px 6px 0">${t}</span>`).join("")}</div><p>Jovem com muita vontade de aprofundar os seus conhecimentos em geociências e ambiente. Criou esta ferramenta para ajudar Nampula a manter as ruas limpas, usando a localização e os dados para decidir melhor onde e quando recolher o lixo.</p>
   <p class="m">Objectivos</p><ul><li>Evitar lixo espalhado na rua quando os contentores enchem.</li><li>Avisar rapidamente a equipa, com foto e localização exata.</li><li>Dar transparência: medir quanto tempo demora cada etapa, bairro a bairro.</li></ul>
   <p class="m">Recomendações aos moradores</p><ul><li>Tire a foto junto ao contentor, com o contentor e o lixo à volta bem visíveis.</li><li>Ative a localização do telemóvel antes de enviar.</li><li>Faça um reporte por contentor por dia; não repita.</li><li>Deite o lixo dentro do contentor e nunca queime.</li></ul>
   <p class="m">Quando alertar</p><ul><li><b>75%:</b> quase cheio, bom momento para avisar.</li><li><b>100%:</b> cheio, avise já.</li><li><b>Transbordando:</b> urgente, há lixo no chão.</li></ul>
@@ -148,6 +181,14 @@ function draw(){
   document.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{const[i,s]=b.dataset.e.split("|");upd(i,s)});
   const c=$("#csv");if(c)c.onclick=exportar;
   document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{atab=+b.dataset.a;draw()});
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{ctab=+b.dataset.c;draw()});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("Eliminar este pedido? Ele deixa de contar nos relatórios."))api({action:"apagar",ids:[b.dataset.del]})});
+  const dm=$("#delmany");if(dm)dm.onclick=()=>{const n=+$("#olds").value,lim=Date.now()-n*864e5,ids=rows.filter(r=>r.estado==="Recolhido"&&(n===0||(r.tf||r.ts)<lim)).map(r=>r.id);if(!ids.length){alert("Não há pedidos nesse critério.");return}if(confirm("Eliminar "+ids.length+" pedido(s) arquivado(s)? Deixam de contar nos relatórios. Exporte o CSV antes, se quiser guardar."))api({action:"apagar",ids})};
+  const i3=$("#dl3");if(i3)i3.onclick=()=>toImg("Relatório por bairro",HA,tabela());
+  const i4=$("#dl4");if(i4)i4.onclick=()=>toPdf("Relatório por bairro",HA,tabela());
+  const k1=$("#c1");if(k1)k1.onclick=()=>dl("relatorio_campo.csv",HC.join(",")+"\n"+tabC().map(l=>l.map(v=>v===null?"":v).join(",")).join("\n"));
+  const k2=$("#c2");if(k2)k2.onclick=()=>toImg("Relatório da equipa de campo",HC,tabC());
+  const k3=$("#c3");if(k3)k3.onclick=()=>toPdf("Relatório da equipa de campo",HC,tabC());
   const pe=$("#per");if(pe)pe.onchange=()=>{per=+pe.value;draw()};
   const d1=$("#dl1");if(d1)d1.onclick=()=>dl("relatorio_bairros.csv",["bairro"].concat(COLS).join(",")+"\n"+tabela().map(l=>l.map(v=>v===null?"":v).join(",")).join("\n"));
   const d2=$("#dl2");if(d2)d2.onclick=()=>{const t=x=>x?new Date(x).toISOString():"";const h=(a,b)=>a&&b?Math.round((a-b)/36e5*100)/100:"";dl("pedidos.csv","id,bairro,pct,lat,lng,estado,data_pedido,data_mandado,data_inicio_recolha,data_recolhido,h_total\n"+filt().map(r=>[r.id,r.bairro,r.pct,r.lat,r.lng,r.estado,t(r.ts),t(r.tm),t(r.tr),t(r.tf),h(r.tf,r.ts)].join(",")).join("\n"))};
