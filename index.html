@@ -23,7 +23,7 @@ img.f{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:
 .m{color:var(--m);font-size:13px}.st{display:flex;gap:8px;margin-bottom:10px}.st div{flex:1;text-align:center}.st b{display:block;font-size:22px}
 </style></head><body>
 <h1>♻️ Contentores de Nampula <button class="sm" id="info">ℹ️ Sobre</button></h1>
-<div class="tabs"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button><button id="t3">Relatórios</button></div>
+<div class="tabs"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button></div>
 <div id="v"></div>
 <script>
 const BAIRROS=["Central","Bombeiros","25 de Setembro","1.º de Maio","Limoeiros","Militar","Muatala","Mutauanha","Muhala","Namutequeliua","Muahivire","Namicopo","Mutava-Rex","Napipine","Carrupeia","Natikiri","Marrupaniua","Marrere"];
@@ -167,9 +167,9 @@ function vIntro(){
   <button class="big" id="go">Começar</button></div>`;
 }
 function draw(){
-  [0,1,2,3].forEach(i=>$("#t"+i).className=i===tab?"on":"");document.querySelector(".tabs").style.display=intro?"none":"flex";
+  [0,1,2].forEach(i=>$("#t"+i).className=i===tab?"on":"");document.querySelector(".tabs").style.display=intro?"none":"flex";
   const keep=$("#bairro")?$("#bairro").value:"";
-  $("#v").innerHTML=intro?vIntro():[vMorador,vCampo,vAdmin,vRel][tab]();
+  $("#v").innerHTML=intro?vIntro():[vMorador,vCampo,vAdmin][tab]();
   const go=$("#go");if(go)go.onclick=()=>{intro=false;try{localStorage.setItem("intro","1")}catch(e){}draw()};
   const c2=$("#csv2");if(c2)c2.onclick=()=>{const h="bairro,reportes,pendentes,morador_ate_admin,admin_ate_campo,recolha,total\n"+linhas().map(l=>[l.b,l.n,l.p,l.a,l.c,l.d,l.t].join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([h],{type:"text/csv"}));a.download="relatorio.csv";a.click()};
   if($("#bairro"))$("#bairro").value=keep;
@@ -196,7 +196,7 @@ function draw(){
   const sv=$("#sv");if(sv)sv.onclick=async()=>{const p=$("#np").value.trim(),k=$("#nc").value.trim();const ok=await api({action:"config",admin:p,campo:k});if(ok&&p)PW=p;msg=ok?"✅ Guardado.":"Falhou.";draw()};
   const ot=$("#out");if(ot)ot.onclick=()=>{adminOk=false;msg="";draw()};
 }
-[0,1,2,3].forEach(i=>$("#t"+i).onclick=()=>{tab=i;msg="";draw()});
+[0,1,2].forEach(i=>$("#t"+i).onclick=()=>{tab=i;msg="";draw()});
 $("#info").onclick=()=>{intro=true;draw()};
 load();setInterval(()=>load(true),15000);
 </script></body></html>
