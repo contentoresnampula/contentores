@@ -22,8 +22,9 @@ select,input[type=text],input[type=password]{width:100%;padding:10px;border-radi
 img.f{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:8px}
 .m{color:var(--m);font-size:13px}.st{display:flex;gap:8px;margin-bottom:10px}.st div{flex:1;text-align:center}.st b{display:block;font-size:22px}
 </style></head><body>
-<h1>♻️ Contentores de Nampula <button class="sm" id="info">ℹ️ Sobre</button></h1>
-<div class="tabs"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><button class="sm" id="burger" style="font-size:22px;margin:0;padding:4px 12px" aria-label="Menu">☰</button><h1 style="margin:0">♻️ Contentores de Nampula</h1></div>
+<div id="menu" class="card" style="display:none;margin-bottom:12px"><button class="sm" data-go="0" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">📝 Reportar um contentor</button><button class="sm" data-go="1" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">🚛 Equipa de campo</button><button class="sm" data-go="2" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">🔐 Administrador</button><button class="sm" data-go="i" style="display:block;width:100%;margin:0;padding:12px;text-align:left">ℹ️ Sobre o projeto</button></div>
+<div class="tabs" style="display:none"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button></div>
 <div id="v"></div>
 <script>
 const BAIRROS=["Central","Bombeiros","25 de Setembro","1.º de Maio","Limoeiros","Militar","Muatala","Mutauanha","Muhala","Namutequeliua","Muahivire","Namicopo","Mutava-Rex","Napipine","Carrupeia","Natikiri","Marrupaniua","Marrere"];
@@ -43,9 +44,19 @@ async function api(b){try{const r=await fetch(URL_API,{method:"POST",body:JSON.s
 async function load(quiet){try{const r=await fetch(URL_API+"?pw="+encodeURIComponent(PW));const j=await r.json();rows=(j.rows||[]).sort((a,b)=>(a.estado==="Recolhido")-(b.estado==="Recolhido")||b.pct-a.pct||a.ts-b.ts);role=j.role||""}catch(e){if(!quiet)msg="Sem ligação ao servidor."}
   if(!quiet||(tab!==0&&!intro))draw()}
 async function upd(id,estado){await api({action:"estado",id,estado})}
+let wid=null;
 function pegarGPS(){
-  msg="A obter localização…";draw();
-  navigator.geolocation.getCurrentPosition(p=>{pos={lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)};msg="";draw()},()=>{msg="Sem GPS. Ative a localização do telemóvel.";draw()},{enableHighAccuracy:true,timeout:15000});
+  if(!navigator.geolocation){msg="Este navegador não suporta localização. Abra o link no Chrome ou no Safari.";draw();return}
+  if(wid!==null){navigator.geolocation.clearWatch(wid);wid=null}
+  let best=null;
+  msg="A obter a localização exata… aguarde até 40 segundos e, se possível, fique ao ar livre.";draw();
+  const parar=()=>{if(wid!==null){navigator.geolocation.clearWatch(wid);wid=null}};
+  const fecha=()=>{parar();
+    if(best&&best.coords.accuracy<=100){pos={lat:+best.coords.latitude.toFixed(6),lng:+best.coords.longitude.toFixed(6),acc:Math.round(best.coords.accuracy)};msg="✅ Localização obtida (precisão de cerca de "+pos.acc+" m).";}
+    else msg=best?"A localização está pouco precisa (cerca de "+Math.round(best.coords.accuracy)+" m). Vá para um sítio aberto, ligue a localização precisa e toque outra vez.":"Não foi possível obter a localização. Ligue a localização do telemóvel e, se abriu o link pelo WhatsApp ou Facebook, abra-o no Chrome ou no Safari.";
+    draw()};
+  const tm=setTimeout(fecha,40000);
+  wid=navigator.geolocation.watchPosition(p=>{if(!best||p.coords.accuracy<best.coords.accuracy)best=p;if(p.coords.accuracy<=30){clearTimeout(tm);fecha()}},e=>{if(e.code===1){clearTimeout(tm);parar();msg="Localização bloqueada. Permita a localização para este site, nas definições do navegador e do telemóvel, e tente outra vez.";draw()}},{enableHighAccuracy:true,timeout:30000,maximumAge:0});
 }
 function reduzir(file){
   const img=new Image,url=URL.createObjectURL(file);
@@ -167,7 +178,7 @@ function vIntro(){
   <button class="big" id="go">Começar</button></div>`;
 }
 function draw(){
-  [0,1,2].forEach(i=>$("#t"+i).className=i===tab?"on":"");document.querySelector(".tabs").style.display=intro?"none":"flex";
+  [0,1,2].forEach(i=>$("#t"+i).className=i===tab?"on":"");document.querySelector(".tabs").style.display="none";
   const keep=$("#bairro")?$("#bairro").value:"";
   $("#v").innerHTML=intro?vIntro():[vMorador,vCampo,vAdmin][tab]();
   const go=$("#go");if(go)go.onclick=()=>{intro=false;try{localStorage.setItem("intro","1")}catch(e){}draw()};
@@ -197,6 +208,7 @@ function draw(){
   const ot=$("#out");if(ot)ot.onclick=()=>{adminOk=false;msg="";draw()};
 }
 [0,1,2].forEach(i=>$("#t"+i).onclick=()=>{tab=i;msg="";draw()});
-$("#info").onclick=()=>{intro=true;draw()};
+$("#burger").onclick=()=>{const m=$("#menu");m.style.display=m.style.display==="none"?"block":"none"};
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const g=b.dataset.go;$("#menu").style.display="none";msg="";if(g==="i")intro=true;else{intro=false;tab=+g}draw()});
 load();setInterval(()=>load(true),15000);
 </script></body></html>
