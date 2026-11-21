@@ -2,6 +2,8 @@
 <html lang="pt"><head><meta charset="utf-8">
 <meta name="theme-color" content="#2f7d46"><meta name="mobile-web-app-capable" content="yes"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Contentores Nampula</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
 :root{--bg:#f4f6f2;--c:#fff;--t:#1b2a1e;--m:#5f6d62;--b:#d9dfd6;--g:#2f7d46;--y:#c99700;--r:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131a14;--c:#1d261f;--t:#e7eee8;--m:#9aa99d;--b:#2e3a30}}
@@ -23,6 +25,7 @@ img.f{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:
 .m{color:var(--m);font-size:13px}.st{display:flex;gap:8px;margin-bottom:10px}.st div{flex:1;text-align:center}.st b{display:block;font-size:22px}
 </style></head><body>
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><button class="sm" id="burger" style="font-size:22px;margin:0;padding:4px 12px" aria-label="Menu">☰</button><h1 style="margin:0">♻️ Contentores de Nampula</h1></div>
+<div id="alerta" style="display:none;background:#d9822b;color:#fff;padding:12px 14px;border-radius:12px;margin-bottom:10px;font-size:16px;cursor:pointer"></div>
 <div id="menu" class="card" style="display:none;margin-bottom:12px"><button class="sm" data-go="0" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">📝 Reportar um contentor</button><button class="sm" data-go="1" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">🚛 Equipa de campo</button><button class="sm" data-go="2" style="display:block;width:100%;margin:0 0 8px;padding:12px;text-align:left">🔐 Administrador</button><button class="sm" data-go="i" style="display:block;width:100%;margin:0;padding:12px;text-align:left">ℹ️ Sobre o projeto</button></div>
 <div class="tabs" style="display:none"><button id="t0">Morador</button><button id="t1">Campo</button><button id="t2">Admin</button></div>
 <div id="v"></div>
@@ -41,7 +44,19 @@ const LS={get(){try{return JSON.parse(localStorage.getItem("rep")||"[]")}catch(e
 draw();
 const URL_API="https://script.google.com/macros/s/AKfycbxTGFkUwH_wNcJxidHLcnFAYlK_ZnYV1reojVLDQL5gYhNvYftCq_nKj3OVSHe4couXaQ/exec";
 async function api(b){try{const r=await fetch(URL_API,{method:"POST",body:JSON.stringify({...b,pw:PW})});const j=await r.json();if(j.ok)load(true);return j.ok}catch(e){return false}}
-async function load(quiet){try{const r=await fetch(URL_API+"?pw="+encodeURIComponent(PW));const j=await r.json();rows=(j.rows||[]).sort((a,b)=>(a.estado==="Recolhido")-(b.estado==="Recolhido")||b.pct-a.pct||a.ts-b.ts);role=j.role||""}catch(e){if(!quiet)msg="Sem ligação ao servidor."}
+let vistos=null,ac=null;
+function bip(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=880;g.gain.value=.2;o.start();setTimeout(()=>o.stop(),350)}catch(e){}}
+function detetar(){
+  const novos=vistos?rows.filter(r=>r.estado==="Reportado"&&!vistos.has(r.id)):[];
+  vistos=new Set(rows.map(r=>r.id));
+  if(!novos.length)return;
+  const m=novos.slice().sort((a,b)=>b.pct-a.pct)[0],el=$("#alerta");
+  document.title="("+novos.length+") Novo aviso · Contentores Nampula";
+  try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+  bip();
+  el.style.display="block";el.innerHTML="🔔 Novo aviso: <b>"+m.bairro+"</b> "+(m.pct>=125?"transbordando":m.pct+"%")+(novos.length>1?" (+"+(novos.length-1)+")":"");
+}
+async function load(quiet){try{const r=await fetch(URL_API+"?pw="+encodeURIComponent(PW));const j=await r.json();rows=(j.rows||[]).sort((a,b)=>(a.estado==="Recolhido")-(b.estado==="Recolhido")||b.pct-a.pct||a.ts-b.ts);role=j.role||"";if(adminOk&&role==="admin")detetar()}catch(e){if(!quiet)msg="Sem ligação ao servidor."}
   if(!quiet||(tab!==0&&!intro))draw()}
 async function upd(id,estado){await api({action:"estado",id,estado})}
 let wid=null;
@@ -73,7 +88,7 @@ const fmt=t=>new Date(t).toLocaleString("pt-PT",{day:"2-digit",month:"2-digit",h
 const maps=r=>"https://www.google.com/maps?q="+r.lat+","+r.lng;
 const urg=p=>p>=100?"#c0392b":p>=75?"#d9822b":"#c99700";
 function item(r,acoes){const uc=r.estado==="Recolhido"?"#2f7d46":urg(r.pct);
-  return `<div class="card" style="border-left:6px solid ${uc}"><b>${r.bairro}</b> <span class="tag" style="background:${uc}">${r.pct>=125?"Transbordando":r.pct+"%"}</span> <span class="tag" style="background:${COR[ESTADOS.indexOf(r.estado)]}">${r.estado}</span>
+  return `<div class="card" style="border-left:6px solid ${uc}"><b>${r.bairro}</b> <span class="tag" style="background:${uc}">${r.pct>=125?"Transbordando":r.pct+"%"}</span>${r.n>1?` <span class="tag" style="background:#5b695e">${r.n} avisos</span>`:""} <span class="tag" style="background:${COR[ESTADOS.indexOf(r.estado)]}">${r.estado}</span>
   <div class="m">${fmt(r.ts)} · ${r.lat}, ${r.lng}</div>${r.foto?`<img class="f" src="${r.foto}">`:""}
   <a class="sm" href="${maps(r)}" target="_blank" rel="noopener">📍 Ver no Google Maps</a>${acoes||""}</div>`;
 }
@@ -98,8 +113,8 @@ function vCampo(){
   if(!campoOk)return `<div class="card"><label>Código de acesso da equipa</label><input type="password" id="cod"><button class="big" id="ok">Entrar</button><p class="m">${msg}</p></div>`;
   const sub=`<div class="tabs"><button class="${ctab===0?"on":""}" data-c="0">Recolher</button><button class="${ctab===1?"on":""}" data-c="1">Relatório</button></div>`;
   if(ctab===1)return sub+vRelCampo();
-  const l=rows.filter(r=>r.estado==="Mandado recolher"||r.estado==="Em recolha");
-  return sub+`<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${r.id}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
+  const l=agrupar(rows.filter(r=>r.estado==="Mandado recolher"||r.estado==="Em recolha"));
+  return sub+`<p class="m">${l.length} contentor(es) para recolher</p>`+(l.map(r=>item(r,r.estado==="Mandado recolher"?`<button class="sm" data-e="${(r.ids||[r.id]).join(",")}|Em recolha">🚛 Em recolha</button>`:`<button class="sm" data-e="${(r.ids||[r.id]).join(",")}|Recolhido">✅ Recolhido</button>`)).join("")||`<div class="card m">Nada para recolher.</div>`);
 }
 function vAdmin0(){
   if(!adminOk)return `<div class="card"><label>Palavra-passe do administrador</label><input type="password" id="pw"><button class="big" id="adm">Entrar</button><p class="m">${msg}</p></div>`;
@@ -109,7 +124,7 @@ function vAdmin0(){
   return `<div class="st">${ESTADOS.map((e,i)=>`<div class="card"><b>${n(i)}</b><span class="m">${e}</span></div>`).join("")}</div>
   <p class="m">Tempo médio até à recolha: ${med} h · <button class="sm" id="csv">⬇️ Exportar CSV (QGIS)</button></p>
   <div class="card"><b>Definições</b><label>Nova palavra-passe do administrador</label><input type="text" id="np"><label>Novo código da equipa de campo</label><input type="text" id="nc" placeholder="deixe vazio para manter"><button class="big" id="sv">Guardar</button><button class="sm" id="out">Sair</button><p class="m">${msg}</p></div>`+
-  rows.filter(r=>r.estado!=="Recolhido").map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${r.id}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${r.id}|Recolhido">✅ Recolhido</button>`:"")+`<button class="sm" data-del="${r.id}">🗑 Eliminar</button>`)).join("");
+  agrupar(rows.filter(r=>r.estado!=="Recolhido")).map(r=>item(r,(r.estado==="Reportado"?`<button class="sm" data-e="${(r.ids||[r.id]).join(",")}|Mandado recolher">📢 Mandar recolher</button>`:"")+(r.estado!=="Recolhido"?`<button class="sm" data-e="${(r.ids||[r.id]).join(",")}|Recolhido">✅ Recolhido</button>`:"")+`<button class="sm" data-del="${(r.ids||[r.id]).join(",")}">🗑 Eliminar</button>`)).join("");
 }
 let atab=0,per=0;
 const DIAS=[0,1,7,30],COLS=["Pedidos","Pendentes","Mandados ao campo","Em recolha","Recolhidos","Críticos (≥100%)","% médio","h Morador→Admin","h Admin→Campo","h Recolha","h Total"];
@@ -126,15 +141,39 @@ function vRelAdm(){
   ${T.map(l=>`<tr><td style="${td};text-align:left"><b>${l[0]}</b></td>${l.slice(1).map(v=>`<td style="${td}">${v===null?"–":v}</td>`).join("")}</tr>`).join("")}</table></div>
   <button class="sm" id="dl1">⬇️ Relatório por bairro (CSV)</button><button class="sm" id="dl2">⬇️ Todos os pedidos (CSV)</button><button class="sm" id="dl3">🖼 Imagem</button><button class="sm" id="dl4">📄 PDF</button>`;
 }
+const RAIO=150;
+const dist=(a,b)=>{const t=x=>x*Math.PI/180,dl=t(b.lat-a.lat),dg=t(b.lng-a.lng),h=Math.sin(dl/2)**2+Math.cos(t(a.lat))*Math.cos(t(b.lat))*Math.sin(dg/2)**2;return 12742000*Math.asin(Math.sqrt(h))};
+function agrupar(l){
+  const gs=[];
+  l.forEach(r=>{const g=gs.find(g=>g.estado===r.estado&&g.bairro===r.bairro&&dist(g.rep,r)<=RAIO);
+    if(g){g.ids.push(r.id);g.n++;if(r.pct>g.pct)g.pct=r.pct;if(r.ts>g.rep.ts)g.rep=r}
+    else gs.push({estado:r.estado,bairro:r.bairro,ids:[r.id],n:1,pct:r.pct,rep:r})});
+  return gs.map(g=>({...g.rep,pct:g.pct,ids:g.ids,n:g.n})).sort((a,b)=>b.pct-a.pct||a.ts-b.ts);
+}
+let mapa=null,mapView=null;
+function vMapa(){
+  return `<div id="map" style="height:430px;border-radius:12px;border:1px solid var(--b);margin-bottom:8px"></div><p class="m">Vermelho: 100% ou mais · Laranja: 75% · Amarelo: 50% ou menos. Avisos a menos de ${RAIO} m aparecem juntos. Toque num ponto para ver os detalhes.</p>`;
+}
+function iniciarMapa(){
+  const el=$("#map");if(!el)return;
+  if(typeof L==="undefined"){el.innerHTML='<p class="m" style="padding:16px">Mapa indisponível. Verifique a ligação à internet.</p>';return}
+  if(mapa){mapa.remove();mapa=null}
+  const pts=agrupar(rows.filter(r=>r.estado!=="Recolhido"&&r.lat&&r.lng)),cs=[];
+  mapa=L.map(el).setView(mapView?mapView.c:[-15.1165,39.2666],mapView?mapView.z:13);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(mapa);
+  pts.forEach(r=>{L.circleMarker([r.lat,r.lng],{radius:11,color:"#ffffff",weight:2,fillColor:urg(r.pct),fillOpacity:.95}).addTo(mapa).bindPopup(`<b>${r.bairro}</b><br>${r.pct>=125?"Transbordando":r.pct+"%"} · ${r.estado}${r.n>1?"<br>"+r.n+" avisos":""}<br><a href="${maps(r)}" target="_blank" rel="noopener">Ver no Google Maps</a>`);cs.push([r.lat,r.lng])});
+  if(!mapView&&cs.length)mapa.fitBounds(cs,{padding:[30,30],maxZoom:16});
+  mapa.on("moveend",()=>{const c=mapa.getCenter();mapView={c:[c.lat,c.lng],z:mapa.getZoom()}});
+}
 function vArq(){
   const l=rows.filter(r=>r.estado==="Recolhido").sort((a,b)=>(b.tf||b.ts)-(a.tf||a.ts));
   return `<p class="m">${l.length} pedido(s) arquivado(s). Continuam a contar nos relatórios.</p>
-  <div class="card"><label>Eliminar vários</label><select id="olds"><option value="30">Arquivados há mais de 30 dias</option><option value="60">Arquivados há mais de 60 dias</option><option value="90">Arquivados há mais de 90 dias</option><option value="0">Todos os arquivados</option></select><button class="big" id="delmany" style="background:var(--r)">Eliminar vários</button></div>`+(l.map(r=>item(r,`<button class="sm" data-del="${r.id}">🗑 Eliminar</button>`)).join("")||`<div class="card m">O arquivo está vazio.</div>`);
+  <div class="card"><label>Eliminar vários</label><select id="olds"><option value="30">Arquivados há mais de 30 dias</option><option value="60">Arquivados há mais de 60 dias</option><option value="90">Arquivados há mais de 90 dias</option><option value="0">Todos os arquivados</option></select><button class="big" id="delmany" style="background:var(--r)">Eliminar vários</button></div>`+(l.map(r=>item(r,`<button class="sm" data-del="${(r.ids||[r.id]).join(",")}">🗑 Eliminar</button>`)).join("")||`<div class="card m">O arquivo está vazio.</div>`);
 }
 function vAdmin(){
   if(!adminOk)return vAdmin0();
-  const t=["Ativos","Arquivo","Relatório"].map((n,k)=>`<button class="${atab===k?"on":""}" data-a="${k}">${n}</button>`).join("");
-  return `<div class="tabs">${t}</div>`+[vAdmin0,vArq,vRelAdm][atab]();
+  const t=["Ativos","Mapa","Arquivo","Relatório"].map((n,k)=>`<button class="${atab===k?"on":""}" data-a="${k}">${n}</button>`).join("");
+  return `<div class="tabs">${t}</div>`+[vAdmin0,vMapa,vArq,vRelAdm][atab]();
 }
 const HA=["Bairro","Pedidos","Pend.","Mandad.","Em rec.","Recolh.","Crít.","% méd.","h M→A","h A→C","h Rec.","h Total"];
 function toImg(t,head,data){
@@ -189,26 +228,28 @@ function draw(){
   document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{pct=+b.dataset.p;draw()});
   const e=$("#env");if(e)e.onclick=enviar;
   const ok=$("#ok");if(ok)ok.onclick=async()=>{PW=$("#cod").value;await load(true);if(role==="campo"||role==="admin"){campoOk=true;msg=""}else{msg="Código errado.";PW=""}draw()};
-  document.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{const[i,s]=b.dataset.e.split("|");upd(i,s)});
+  document.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{const[i,s]=b.dataset.e.split("|");(async()=>{for(const x of i.split(","))await upd(x,s)})()});
   const c=$("#csv");if(c)c.onclick=exportar;
   document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{atab=+b.dataset.a;draw()});
   document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{ctab=+b.dataset.c;draw()});
-  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("Eliminar este pedido? Ele deixa de contar nos relatórios."))api({action:"apagar",ids:[b.dataset.del]})});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const ids=b.dataset.del.split(",");if(confirm("Eliminar "+(ids.length>1?"estes "+ids.length+" avisos":"este pedido")+"? Deixa de contar nos relatórios."))api({action:"apagar",ids})});
   const dm=$("#delmany");if(dm)dm.onclick=()=>{const n=+$("#olds").value,lim=Date.now()-n*864e5,ids=rows.filter(r=>r.estado==="Recolhido"&&(n===0||(r.tf||r.ts)<lim)).map(r=>r.id);if(!ids.length){alert("Não há pedidos nesse critério.");return}if(confirm("Eliminar "+ids.length+" pedido(s) arquivado(s)? Deixam de contar nos relatórios. Exporte o CSV antes, se quiser guardar."))api({action:"apagar",ids})};
   const i3=$("#dl3");if(i3)i3.onclick=()=>toImg("Relatório por bairro",HA,tabela());
   const i4=$("#dl4");if(i4)i4.onclick=()=>toPdf("Relatório por bairro",HA,tabela());
   const k1=$("#c1");if(k1)k1.onclick=()=>dl("relatorio_campo.csv",HC.join(",")+"\n"+tabC().map(l=>l.map(v=>v===null?"":v).join(",")).join("\n"));
   const k2=$("#c2");if(k2)k2.onclick=()=>toImg("Relatório da equipa de campo",HC,tabC());
   const k3=$("#c3");if(k3)k3.onclick=()=>toPdf("Relatório da equipa de campo",HC,tabC());
+  if($("#map"))iniciarMapa();
   const pe=$("#per");if(pe)pe.onchange=()=>{per=+pe.value;draw()};
   const d1=$("#dl1");if(d1)d1.onclick=()=>dl("relatorio_bairros.csv",["bairro"].concat(COLS).join(",")+"\n"+tabela().map(l=>l.map(v=>v===null?"":v).join(",")).join("\n"));
   const d2=$("#dl2");if(d2)d2.onclick=()=>{const t=x=>x?new Date(x).toISOString():"";const h=(a,b)=>a&&b?Math.round((a-b)/36e5*100)/100:"";dl("pedidos.csv","id,bairro,pct,lat,lng,estado,data_pedido,data_mandado,data_inicio_recolha,data_recolhido,h_total\n"+filt().map(r=>[r.id,r.bairro,r.pct,r.lat,r.lng,r.estado,t(r.ts),t(r.tm),t(r.tr),t(r.tf),h(r.tf,r.ts)].join(",")).join("\n"))};
-  const ad=$("#adm");if(ad)ad.onclick=async()=>{PW=$("#pw").value;await load(true);if(role==="admin"){adminOk=true;msg=""}else{msg="Palavra-passe errada.";PW=""}draw()};
+  const ad=$("#adm");if(ad)ad.onclick=async()=>{try{ac=ac||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}vistos=null;PW=$("#pw").value;await load(true);if(role==="admin"){adminOk=true;msg=""}else{msg="Palavra-passe errada.";PW=""}draw()};
   const sv=$("#sv");if(sv)sv.onclick=async()=>{const p=$("#np").value.trim(),k=$("#nc").value.trim();const ok=await api({action:"config",admin:p,campo:k});if(ok&&p)PW=p;msg=ok?"✅ Guardado.":"Falhou.";draw()};
   const ot=$("#out");if(ot)ot.onclick=()=>{adminOk=false;msg="";draw()};
 }
 [0,1,2].forEach(i=>$("#t"+i).onclick=()=>{tab=i;msg="";draw()});
 $("#burger").onclick=()=>{const m=$("#menu");m.style.display=m.style.display==="none"?"block":"none"};
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const g=b.dataset.go;$("#menu").style.display="none";msg="";if(g==="i")intro=true;else{intro=false;tab=+g}draw()});
-load();setInterval(()=>load(true),15000);
+$("#alerta").onclick=()=>{$("#alerta").style.display="none";document.title="Contentores Nampula";tab=2;atab=0;draw()};
+load();setInterval(()=>{if(PW)load(true)},10000);
 </script></body></html>
